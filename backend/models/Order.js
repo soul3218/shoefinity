@@ -7,10 +7,15 @@ const orderSchema = new mongoose.Schema(
     items: [
       {
         shoe: { type: mongoose.Schema.Types.ObjectId, ref: "Shoe", required: true },
+        shoeName: { type: String, required: true },
+        unitPrice: { type: Number, required: true },
         quantity: { type: Number, required: true },
         size: { type: Number, required: true },
       },
     ],
+    subtotal: { type: Number, required: true },
+    discount: { type: Number, default: 0 },
+    couponCode: { type: String, trim: true, uppercase: true },
     total: { type: Number, required: true },
     paymentMethod: { type: String, enum: ["online", "card", "cod"], required: true },
     address: {

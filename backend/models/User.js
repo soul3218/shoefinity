@@ -7,6 +7,14 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["admin", "user"], default: "user" },
+    cart: [
+      {
+        shoe: { type: mongoose.Schema.Types.ObjectId, ref: "Shoe", required: true },
+        quantity: { type: Number, required: true, min: 1, default: 1 },
+        size: { type: Number, required: true },
+      },
+    ],
+    wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Shoe" }],
   },
   { timestamps: true }
 );
@@ -22,4 +30,3 @@ userSchema.methods.matchPassword = async function (entered) {
 };
 
 module.exports = mongoose.model("User", userSchema);
-

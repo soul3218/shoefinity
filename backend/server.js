@@ -2,13 +2,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// TEMP: Debug Mongo connection string
-// eslint-disable-next-line no-console
-console.log(process.env.MONGO_URL);
-
 const connectDB = require("./config/db");
 const seedAdmin = require("./config/seedAdmin");
 const seedShoes = require("./config/seedShoes");
+const seedCoupons = require("./config/seedCoupons");
 
 const app = express();
 let dbReady = false;
@@ -32,6 +29,8 @@ app.use("/api", (req, res, next) => {
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/shoes", require("./routes/shoeRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/coupons", require("./routes/couponRoutes"));
 
 app.use((err, _req, res, _next) => {
   // eslint-disable-next-line no-console
@@ -49,6 +48,7 @@ connectDB()
     console.log("MongoDB connected");
     await seedAdmin();
     await seedShoes();
+    await seedCoupons();
     app.listen(port, () => {
       // eslint-disable-next-line no-console
       console.log(`Server running on port ${port}`);

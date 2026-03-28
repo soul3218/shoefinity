@@ -1,12 +1,14 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
-import type { Address, Shoe, Order } from "@/types";
-import { mockShoes, mockOrders } from "@/data/mockData";
+import { createContext, useContext, useMemo, useCallback, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Address, Order, Shoe } from "@/types";
 import { apiJson } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ShoeContextType {
   shoes: Shoe[];
   orders: Order[];
+  shoesLoading: boolean;
+  ordersLoading: boolean;
   addShoe: (shoe: Omit<Shoe, "_id">) => Promise<boolean>;
   updateShoe: (id: string, shoe: Partial<Shoe>) => Promise<boolean>;
   deleteShoe: (id: string) => Promise<boolean>;
@@ -62,7 +64,8 @@ function normalizeOrderAddress(order: ApiOrder): Address | undefined {
     return "";
   };
 
-  const pickFromSources = (...keys: string[]) => pick(...sources.flatMap((source) => keys.map((key) => source[key])));
+  const pickFromSources = (...keys: string[]) =>
+    pick(...sources.flatMap((source) => keys.map((key) => source[key])));
 
   const street = pick(
     typeof order.address === "string" ? order.address : undefined,
@@ -71,11 +74,22 @@ function normalizeOrderAddress(order: ApiOrder): Address | undefined {
   );
   const city = pick(pickFromSources("city", "town"), order.city);
   const state = pick(pickFromSources("state", "province", "region"), order.state);
-  const pincode = pick(pickFromSources("pincode", "postalCode", "zip", "zipCode"), order.pincode, order.postalCode, order.zip, order.zipCode);
-  const phone = pick(pickFromSources("phone", "phoneNumber", "mobile", "mobileNumber"), order.phone, order.phoneNumber, order.mobile, order.mobileNumber);
+  const pincode = pick(
+    pickFromSources("pincode", "postalCode", "zip", "zipCode"),
+    order.pincode,
+    order.postalCode,
+    order.zip,
+    order.zipCode
+  );
+  const phone = pick(
+    pickFromSources("phone", "phoneNumber", "mobile", "mobileNumber"),
+    order.phone,
+    order.phoneNumber,
+    order.mobile,
+    order.mobileNumber
+  );
 
   if (![street, city, state, pincode, phone].some(Boolean)) return undefined;
-
   return { street, city, state, pincode, phone };
 }
 
@@ -88,84 +102,171 @@ function normalizeOrder(order: ApiOrder): Order {
 
 export function ShoeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [shoes, setShoes] = useState<Shoe[]>(mockShoes);
-  const [orders, setOrders] = useState<Order[]>(mockOrders.map(normalizeOrder));
+  const queryClient = useQueryClient();
+  const token = user?.token;
 
-  const token = useMemo(() => user?.token ?? localStorage.getItem("token") ?? undefined, [user?.token]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const shoesQuery = useQuery({
+    queryKey: ["shoes"],
+    initialData: [] as Shoe[],
+    queryFn: async () => {
       const res = await apiJson<Shoe[]>("/api/shoes", { method: "GET" });
-      if (!cancelled && res.ok && Array.isArray(res.data)) setShoes(res.data);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      if (!res.ok || !Array.isArray(res.data)) throw new Error("Failed to load shoes");
+      return res.data;
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!token || !user) {
-        setOrders([]);
-        return;
-      }
-      const path = user.role === "admin" ? "/api/orders" : "/api/orders/mine";
+  const ordersQuery = useQuery({
+    queryKey: ["orders", user?._id, user?.role],
+    enabled: Boolean(token && user),
+    initialData: [] as Order[],
+    queryFn: async () => {
+      const path = user?.role === "admin" ? "/api/orders" : "/api/orders/mine";
       const res = await apiJson<ApiOrder[]>(path, { method: "GET", token });
-      if (!cancelled && res.ok && Array.isArray(res.data)) setOrders(res.data.map(normalizeOrder));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, user]);
+      if (!res.ok || !Array.isArray(res.data)) throw new Error("Failed to load orders");
+      return res.data.map(normalizeOrder);
+    },
+  });
+
+  const addShoeMutation = useMutation({
+    mutationFn: async (shoe: Omit<Shoe, "_id">) => {
+      if (!token) throw new Error("Unauthorized");
+      const res = await apiJson<Shoe>("/api/shoes", {
+        method: "POST",
+        token,
+        body: JSON.stringify(shoe),
+      });
+      if (!res.ok || !res.data?._id) throw new Error("Failed to add shoe");
+      return res.data;
+    },
+    onSuccess: (shoe) => {
+      queryClient.setQueryData<Shoe[]>(["shoes"], (previous = []) => [shoe, ...previous]);
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+
+  const updateShoeMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Shoe> }) => {
+      if (!token) throw new Error("Unauthorized");
+      const res = await apiJson<Shoe>(`/api/shoes/${id}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok || !res.data?._id) throw new Error("Failed to update shoe");
+      return res.data;
+    },
+    onSuccess: (shoe) => {
+      queryClient.setQueryData<Shoe[]>(["shoes"], (previous = []) =>
+        previous.map((item) => (item._id === shoe._id ? shoe : item))
+      );
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+
+  const deleteShoeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!token) throw new Error("Unauthorized");
+      const res = await apiJson<{ message?: string }>(`/api/shoes/${id}`, {
+        method: "DELETE",
+        token,
+      });
+      if (!res.ok) throw new Error("Failed to delete shoe");
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<Shoe[]>(["shoes"], (previous = []) =>
+        previous.filter((shoe) => shoe._id !== id)
+      );
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+
+  const addOrderMutation = useMutation({
+    mutationFn: async (order: Omit<Order, "_id" | "createdAt">) => {
+      if (!token) throw new Error("Unauthorized");
+      const res = await apiJson<ApiOrder>("/api/orders", {
+        method: "POST",
+        token,
+        body: JSON.stringify(order),
+      });
+      if (!res.ok || !res.data?._id) throw new Error("Failed to create order");
+      return normalizeOrder(res.data);
+    },
+    onSuccess: (order) => {
+      queryClient.setQueryData<Order[]>(
+        ["orders", user?._id, user?.role],
+        (previous = []) => [order, ...previous]
+      );
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.setQueryData(["cart", user?._id], []);
+    },
+  });
 
   const addShoe = useCallback(
     async (shoe: Omit<Shoe, "_id">) => {
-      if (!token) return false;
-      const res = await apiJson<Shoe>("/api/shoes", { method: "POST", token, body: JSON.stringify(shoe) });
-      if (!res.ok) return false;
-      setShoes((prev) => [res.data, ...prev]);
-      return true;
+      try {
+        await addShoeMutation.mutateAsync(shoe);
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [token]
+    [addShoeMutation]
   );
 
   const updateShoe = useCallback(
-    async (id: string, updates: Partial<Shoe>) => {
-      if (!token) return false;
-      const res = await apiJson<Shoe>(`/api/shoes/${id}`, { method: "PUT", token, body: JSON.stringify(updates) });
-      if (!res.ok) return false;
-      setShoes((prev) => prev.map((s) => (s._id === id ? res.data : s)));
-      return true;
+    async (id: string, shoe: Partial<Shoe>) => {
+      try {
+        await updateShoeMutation.mutateAsync({ id, updates: shoe });
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [token]
+    [updateShoeMutation]
   );
 
   const deleteShoe = useCallback(
     async (id: string) => {
-      if (!token) return false;
-      const res = await apiJson<{ message?: string }>("/api/shoes/" + id, { method: "DELETE", token });
-      if (!res.ok) return false;
-      setShoes((prev) => prev.filter((s) => s._id !== id));
-      return true;
+      try {
+        await deleteShoeMutation.mutateAsync(id);
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [token]
+    [deleteShoeMutation]
   );
 
   const addOrder = useCallback(
     async (order: Omit<Order, "_id" | "createdAt">) => {
-      if (!token) return false;
-      const res = await apiJson<ApiOrder>("/api/orders", { method: "POST", token, body: JSON.stringify(order) });
-      if (!res.ok) return false;
-      setOrders((prev) => [normalizeOrder(res.data), ...prev]);
-      return true;
+      try {
+        await addOrderMutation.mutateAsync(order);
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [token]
+    [addOrderMutation]
   );
 
+  const shoes = useMemo(() => shoesQuery.data ?? [], [shoesQuery.data]);
+  const orders = useMemo(() => (user ? ordersQuery.data ?? [] : []), [ordersQuery.data, user]);
+
   return (
-    <ShoeContext.Provider value={{ shoes, orders, addShoe, updateShoe, deleteShoe, addOrder }}>
+    <ShoeContext.Provider
+      value={{
+        shoes,
+        orders,
+        shoesLoading: shoesQuery.isLoading,
+        ordersLoading: ordersQuery.isLoading,
+        addShoe,
+        updateShoe,
+        deleteShoe,
+        addOrder,
+      }}
+    >
       {children}
     </ShoeContext.Provider>
   );

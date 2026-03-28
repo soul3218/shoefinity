@@ -1,8 +1,9 @@
 import type { Shoe } from "@/types";
-import { ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWishlist } from "@/hooks/useWishlist";
 import { toast } from "sonner";
 import { useState } from "react";
 import { formatINR } from "@/lib/currency";
@@ -13,8 +14,10 @@ interface ShoeCardProps {
 
 const ShoeCard = ({ shoe }: ShoeCardProps) => {
   const { addToCart } = useCart();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const [selectedSize, setSelectedSize] = useState(shoe.sizes[0]);
+  const wishlisted = isWishlisted(shoe._id);
 
   const handleAdd = () => {
     if (!user) {
@@ -23,6 +26,17 @@ const ShoeCard = ({ shoe }: ShoeCardProps) => {
     }
     addToCart(shoe, selectedSize);
     toast.success(`${shoe.name} added to cart!`);
+  };
+
+  const handleWishlist = async () => {
+    if (!user) {
+      toast.error("Please login to save favorites");
+      return;
+    }
+
+    const ok = await toggleWishlist(shoe);
+    if (!ok) return;
+    toast.success(wishlisted ? `${shoe.name} removed from wishlist` : `${shoe.name} saved to wishlist`);
   };
 
   return (
@@ -36,6 +50,20 @@ const ShoeCard = ({ shoe }: ShoeCardProps) => {
         <span className="absolute left-3 top-3 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
           {shoe.category}
         </span>
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={handleWishlist}
+            className={`absolute right-3 top-3 rounded-full border p-2 transition-colors ${
+              wishlisted
+                ? "border-rose-200 bg-rose-500 text-white"
+                : "border-border bg-background/90 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <Heart className={`h-4 w-4 ${wishlisted ? "fill-current" : ""}`} />
+          </button>
+        )}
       </div>
       <div className="p-4">
         <h3 className="font-display text-lg font-semibold">{shoe.name}</h3>

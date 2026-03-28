@@ -1,32 +1,44 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 
-const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
+const loginSchema = z.object({
+  email: z.string().email("Enter a valid email address."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const success = await login(email, password);
-    setLoading(false);
-    if (success) {
-      toast.success("Welcome back!");
-      // Redirect based on role — checked after login
-      const isAdmin = email === "admin@kicks.com";
-      navigate(isAdmin ? "/admin" : "/shop");
-    } else {
+type LoginValues = z.infer<typeof loginSchema>;
+
+const Login = () => {
+  const { login, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const handleSubmit = async (values: LoginValues) => {
+    const loggedInUser = await login(values.email, values.password);
+    if (!loggedInUser) {
       toast.error("Invalid email or password");
+      return;
     }
+
+    toast.success("Welcome back!");
+    const fromPath = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+    const nextPath = loggedInUser.role === "admin" ? "/admin" : fromPath && fromPath !== "/admin" ? fromPath : "/shop";
+    navigate(nextPath, { replace: true });
   };
 
   return (
@@ -35,33 +47,54 @@ const Login = () => {
       <main className="flex flex-1 items-center justify-center px-4 py-20">
         <div className="w-full max-w-md animate-scale-in rounded-lg border border-border bg-card p-8 shadow-card">
           <h1 className="text-center font-display text-2xl font-bold">Welcome Back</h1>
-          <p className="mt-2 text-center text-sm text-muted-foreground">
-            Sign in to your account
-          </p>
+          <p className="mt-2 text-center text-sm text-muted-foreground">Sign in to your account</p>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-            </div>
-            <Button type="submit" className="w-full shadow-button" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-6 space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="you@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Enter your password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" className="w-full shadow-button" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          </Form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link to="/signup" className="font-medium text-primary hover:underline">Sign up</Link>
+            <Link to="/signup" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
           </p>
 
           <div className="mt-6 rounded-md bg-accent p-3 text-xs text-accent-foreground">
             <p className="font-semibold">Demo credentials:</p>
             <p>Admin: admin@kicks.com / admin123</p>
-            <p>User: user@kicks.com / user123</p>
           </div>
         </div>
       </main>

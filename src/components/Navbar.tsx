@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ShoppingCart, User, Menu, X, LogOut, Search } from "lucide-react";
+import { ShoppingCart, User, Menu, X, LogOut, Search, Heart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWishlist } from "@/hooks/useWishlist";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -10,6 +11,7 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { itemCount } = useCart();
+  const { itemCount: wishlistCount } = useWishlist();
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,15 +82,25 @@ const Navbar = () => {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          {!isAdmin && (
-            <Link to="/cart" className="relative rounded-lg p-2 transition-colors hover:bg-secondary">
-              <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                  {itemCount}
-                </span>
-              )}
-            </Link>
+          {!isAdmin && user && (
+            <>
+              <Link to="/wishlist" className="relative rounded-lg p-2 transition-colors hover:bg-secondary">
+                <Heart className="h-5 w-5" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+              <Link to="/cart" className="relative rounded-lg p-2 transition-colors hover:bg-secondary">
+                <ShoppingCart className="h-5 w-5" />
+                {itemCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {itemCount}
+                  </span>
+                )}
+              </Link>
+            </>
           )}
           {user ? (
             <div className="flex items-center gap-2">
@@ -141,10 +153,15 @@ const Navbar = () => {
             <Link to="/" onClick={() => setMobileOpen(false)} className="text-sm font-medium">Home</Link>
             <Link to="/shop" onClick={() => setMobileOpen(false)} className="text-sm font-medium">Shop</Link>
             {isAdmin && <Link to="/admin" onClick={() => setMobileOpen(false)} className="text-sm font-medium">Dashboard</Link>}
-            {!isAdmin && (
-              <Link to="/cart" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 text-sm font-medium">
-                <ShoppingCart className="h-4 w-4" /> Cart ({itemCount})
-              </Link>
+            {!isAdmin && user && (
+              <>
+                <Link to="/wishlist" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 text-sm font-medium">
+                  <Heart className="h-4 w-4" /> Wishlist ({wishlistCount})
+                </Link>
+                <Link to="/cart" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 text-sm font-medium">
+                  <ShoppingCart className="h-4 w-4" /> Cart ({itemCount})
+                </Link>
+              </>
             )}
             {user ? (
               <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="flex items-center gap-2 text-sm font-medium text-destructive">

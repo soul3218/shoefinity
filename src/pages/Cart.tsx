@@ -1,17 +1,13 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useCart } from "@/contexts/CartContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { formatINR } from "@/lib/currency";
 
 const Cart = () => {
-  const { items, removeFromCart, updateQuantity, total, itemCount } = useCart();
-  const { user } = useAuth();
-
-  if (!user) return <Navigate to="/login" />;
+  const { items, removeFromCart, updateQuantity, total, itemCount, isLoading, isSyncing } = useCart();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -21,6 +17,13 @@ const Cart = () => {
           <h1 className="font-display text-3xl font-bold">
             Your <span className="text-gradient">Cart</span>
           </h1>
+
+          {isLoading && (
+            <p className="mt-4 text-sm text-muted-foreground">Loading your saved cart...</p>
+          )}
+          {!isLoading && isSyncing && (
+            <p className="mt-4 text-sm text-muted-foreground">Saving your cart...</p>
+          )}
 
           {items.length === 0 ? (
             <div className="mt-20 text-center">
@@ -49,22 +52,24 @@ const Cart = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.shoe._id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.shoe._id, item.size, item.quantity - 1)}
                             className="rounded-md border border-border p-1 transition-colors hover:bg-secondary"
                           >
                             <Minus className="h-4 w-4" />
                           </button>
                           <span className="w-8 text-center font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.shoe._id, item.quantity + 1)}
+                            onClick={() => updateQuantity(item.shoe._id, item.size, item.quantity + 1)}
                             className="rounded-md border border-border p-1 transition-colors hover:bg-secondary"
                           >
                             <Plus className="h-4 w-4" />
                           </button>
                         </div>
-                        <span className="font-display font-bold">{formatINR(item.shoe.price * item.quantity)}</span>
+                        <span className="font-display font-bold">
+                          {formatINR((item.unitPrice ?? item.shoe.price) * item.quantity)}
+                        </span>
                         <button
-                          onClick={() => removeFromCart(item.shoe._id)}
+                          onClick={() => removeFromCart(item.shoe._id, item.size)}
                           className="rounded-md p-1 text-destructive transition-colors hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
