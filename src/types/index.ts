@@ -23,6 +23,14 @@ export interface CartItem {
   size: number;
 }
 
+export interface Address {
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+  phone: string;
+}
+
 export interface Order {
   _id: string;
   userId: string;
@@ -31,5 +39,6 @@ export interface Order {
   total: number;
   paymentMethod: "online" | "card" | "cod";
   status: "pending" | "confirmed" | "shipped" | "delivered";
+  address?: Address;
   createdAt: string;
 }

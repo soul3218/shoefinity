@@ -34,6 +34,11 @@ const Checkout = () => {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [stateVal, setStateVal] = useState("");
+  const [pincode, setPincode] = useState("");
 
   useEffect(() => {
     setPaymentError(null);
@@ -86,6 +91,7 @@ const Checkout = () => {
       total,
       paymentMethod: payment,
       status: "confirmed",
+      address: { street, city, state: stateVal, pincode, phone },
     });
 
     if (!ok) {
@@ -152,15 +158,27 @@ const Checkout = () => {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Full Name</Label>
-                <Input defaultValue={user.name} />
+                <Input defaultValue={user.name} readOnly />
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input placeholder="+1 234 567 890" />
+                <Input placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Address</Label>
-                <Input placeholder="123 Main St, City, Country" />
+                <Label>Street Address</Label>
+                <Input placeholder="123 Main St" value={street} onChange={(e) => setStreet(e.target.value)} />
+              </div>
+              <div>
+                <Label>City</Label>
+                <Input placeholder="Mumbai" value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+              <div>
+                <Label>State</Label>
+                <Input placeholder="Maharashtra" value={stateVal} onChange={(e) => setStateVal(e.target.value)} />
+              </div>
+              <div>
+                <Label>Pincode</Label>
+                <Input placeholder="400001" value={pincode} onChange={(e) => setPincode(e.target.value)} />
               </div>
             </div>
           </div>

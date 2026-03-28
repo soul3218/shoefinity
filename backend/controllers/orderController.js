@@ -9,7 +9,7 @@ function normalizeItemShoeId(item) {
 }
 
 const createOrder = async (req, res) => {
-  const { items, total, paymentMethod, status } = req.body || {};
+  const { items, total, paymentMethod, status, address } = req.body || {};
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Items required" });
   if (total == null) return res.status(400).json({ message: "Total required" });
   if (!paymentMethod) return res.status(400).json({ message: "Payment method required" });
@@ -31,6 +31,7 @@ const createOrder = async (req, res) => {
     total,
     paymentMethod,
     status: status || "pending",
+    address,
   });
 
   const populated = await Order.findById(order._id).populate("items.shoe");

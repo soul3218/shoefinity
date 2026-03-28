@@ -1,6 +1,10 @@
+const envApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+
 export const API_BASE_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  "https://shoefinity-shoes-e-commerce-t6q0.onrender.com";
+  envApiUrl ||
+  (import.meta.env.DEV
+    ? "http://localhost:5000"
+    : "https://shoefinity-shoes-e-commerce-t6q0.onrender.com");
   
 export function withApiBase(path: string) {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
@@ -25,4 +29,3 @@ export async function apiJson<T>(
   const data = (await res.json().catch(() => ({}))) as T;
   return { ok: res.ok, status: res.status, data };
 }
-
